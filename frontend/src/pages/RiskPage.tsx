@@ -1,0 +1,12 @@
+import { Card } from '../components/ui/Card'
+
+export function RiskPage() {
+  return (
+    <div className="flex flex-col gap-6">
+      <h2 className="text-2xl font-bold">Risk Analytics</h2>
+      <Card title="Portfolio Risk">
+        <p className="text-gray-500 text-sm">Risk analytics coming in Phase 8.</p>
+      </Card>
+    </div>
+  )
+}

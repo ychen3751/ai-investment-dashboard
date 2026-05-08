@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-gray-800;
+  }
+
+  body {
+    @apply bg-gray-950 text-gray-100 antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  /* Professional scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #374151;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #4b5563;
+  }
+
+  /* Monospace for financial data */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Selection color — fintech blue */
+  ::selection {
+    background: rgba(59, 130, 246, 0.3);
+    color: #fff;
+  }
+
+  /* Focus ring consistency */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-primary-500/50 ring-offset-1 ring-offset-gray-950;
+  }
+
+  /* Smooth transitions for interactive elements */
+  button, a, input, select {
+    @apply transition-all duration-150;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-gray-900 rounded-xl border border-gray-800 p-4;
+  }
+
+  /* Subtle hover lift for interactive cards */
+  .card-interactive {
+    @apply card cursor-pointer hover:border-primary-500/30 hover:shadow-lg hover:shadow-primary-500/5 transition-all duration-200;
+  }
+
+  /* Frosted glass effect for modals/overlays */
+  .glass {
+    @apply bg-gray-900/80 backdrop-blur-xl border border-gray-800;
+  }
+
+  /* Price up/down animations */
+  .flash-green {
+    animation: flash-green 0.6s ease-out;
+  }
+  .flash-red {
+    animation: flash-red 0.6s ease-out;
+  }
+  @keyframes flash-green {
+    0% { background-color: rgba(34, 197, 94, 0.2); }
+    100% { background-color: transparent; }
+  }
+  @keyframes flash-red {
+    0% { background-color: rgba(239, 68, 68, 0.2); }
+    100% { background-color: transparent; }
+  }
+
+  /* Data table row hover */
+  .table-row {
+    @apply border-b border-gray-800/50 transition-colors duration-100;
+  }
+  .table-row:hover {
+    @apply bg-gray-800/40;
+  }
+  .table-header {
+    @apply text-left text-gray-500 font-medium py-2 px-3 text-xs uppercase tracking-wider;
+  }
+  .table-cell {
+    @apply py-2 px-3 text-sm tabular-nums;
+  }
+}

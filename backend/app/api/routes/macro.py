@@ -3,9 +3,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.models.user import User
-from app.services import macro_service
+from app.services import macro_service, macro_overview_service
 
 router = APIRouter()
+
+
+@router.get("/overview")
+async def get_macro_overview():
+    """Consolidated macro dashboard: regime, indicators, signals, sectors, economics.
+
+    No authentication required.  Educational purposes only.
+    """
+    return await macro_overview_service.get_macro_overview()
 
 
 @router.get("/indices")

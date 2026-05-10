@@ -42,3 +42,24 @@ export async function fetchCorrelation(portfolioId: string): Promise<{
   const { data } = await client.get(`/risk/correlation/${portfolioId}`)
   return data
 }
+
+export interface StressTestResult {
+  scenarios: Array<{
+    scenario_id: string
+    scenario_name: string
+    description: string
+    market_shock_pct: number
+    volatility_shock_pct: number
+    impact_pct: number
+    impact_value: number
+    position_impacts: Array<{ symbol: string; impact_value: number; impact_pct: number; beta_used: number }>
+  }>
+  worst_case: { scenario: string; impact_pct: number } | null
+  portfolio_value: number
+  error?: string
+}
+
+export async function fetchStressTest(portfolioId: string): Promise<StressTestResult> {
+  const { data } = await client.get(`/risk/stress/${portfolioId}`)
+  return data
+}

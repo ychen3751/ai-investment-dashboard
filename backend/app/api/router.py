@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes import auth, portfolios, market, technical, analysis, options, earnings, watchlists, alerts, macro, risk
+from app.api.routes import auth, portfolios, market, technical, analysis, options, earnings, watchlists, alerts, macro, risk, news, chat
 
 api_router = APIRouter()
 
@@ -15,6 +15,8 @@ api_router.include_router(watchlists.router, prefix="/watchlists", tags=["watchl
 api_router.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 api_router.include_router(macro.router, prefix="/macro", tags=["macro"])
 api_router.include_router(risk.router, prefix="/risk", tags=["risk"])
+api_router.include_router(news.router, prefix="/news", tags=["news"])
+api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession

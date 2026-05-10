@@ -4,7 +4,7 @@ from typing import Optional
 
 from app.core.deps import get_current_user, get_db
 from app.models.user import User
-from app.services import options_chain_service, options_analysis_service
+from app.services import options_chain_service, options_analysis_service, options_strategy_service
 from app.services import options_service
 
 router = APIRouter()
@@ -82,6 +82,21 @@ async def get_options_flow(
 @router.get("/flow/stats")
 async def get_flow_stats(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     return await options_service.get_flow_stats(db)
+
+
+@router.post("/strategy")
+async def recommend_strategy(
+    bias: str = "bullish",
+    volatility: str = "moderate",
+    risk_tolerance: str = "moderate",
+    capital: float = 1000,
+    time_horizon: str = "medium",
+):
+    """AI options strategy recommendation based on market outlook and risk tolerance.
+
+    Educational only — not financial advice.
+    """
+    return await options_strategy_service.recommend_strategy(bias, volatility, risk_tolerance, capital, time_horizon)
 
 
 @router.post("/flow/scan")

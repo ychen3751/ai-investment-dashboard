@@ -12,6 +12,7 @@ import { fetchPortfolio, fetchHoldings, addHolding, updateHolding, removeHolding
 import type { OptionPosition } from '../types/option'
 import { Badge } from '../components/ui/Badge'
 import { PriceChange } from '../components/shared/PriceChange'
+import { PortfolioTreemap } from '../components/charts/PortfolioTreemap'
 import { num, fmtPct, fmtCurrency } from '../utils/formatters'
 import type { Holding } from '../types/portfolio'
 
@@ -303,6 +304,28 @@ export function PortfolioDetailPage() {
           <MetricCard label="Volatility (Ann.)" value={perf.volatility_pct != null ? `${perf.volatility_pct.toFixed(2)}%` : 'N/A'} />
           <MetricCard label="Sharpe Ratio" value={perf.sharpe_ratio != null ? perf.sharpe_ratio.toFixed(2) : 'N/A'} />
           <MetricCard label="Max Drawdown" value={perf.max_drawdown_pct != null ? `${perf.max_drawdown_pct.toFixed(2)}%` : 'N/A'} />
+        </div>
+      )}
+
+      {/* Portfolio Heatmap */}
+      {holdings && holdings.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Holdings Heatmap</h3>
+            <div className="h-px flex-1 bg-gradient-to-r from-gray-800 to-transparent" />
+          </div>
+          <PortfolioTreemap
+            data={holdings.map((h) => ({
+              symbol: h.symbol,
+              value: num(h.allocation_pct),
+              pnlPct: num(h.total_pnl_pct),
+              dayPct: num(h.day_change_pct),
+              marketValue: num(h.market_value),
+            }))}
+            width={typeof window !== 'undefined' ? Math.min(800, window.innerWidth - 320) : 600}
+            height={360}
+            onSelect={(sym) => window.open(`/analysis?symbol=${sym}`, '_blank')}
+          />
         </div>
       )}
 

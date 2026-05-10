@@ -10,7 +10,7 @@ from app.schemas.portfolio import (
     TransactionCreate, TransactionResponse, PerformanceResponse, PortfolioSummary,
 )
 from app.schemas.option_position import OptionPositionCreate, OptionPositionUpdate, OptionPositionResponse
-from app.services import portfolio_service, option_service
+from app.services import portfolio_service, option_service, portfolio_advisor_service
 
 router = APIRouter()
 
@@ -176,3 +176,21 @@ async def update_option(portfolio_id: uuid.UUID, option_id: uuid.UUID, data: Opt
 async def delete_option(portfolio_id: uuid.UUID, option_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await portfolio_service.get_portfolio(db, current_user.id, portfolio_id)
     await option_service.delete_option(db, portfolio_id, option_id)
+
+
+@router.get("/{portfolio_id}/advisor")
+async def get_portfolio_advisor(portfolio_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """AI portfolio advisor: scores, risks, sector analysis, correlation, suggestions."""
+    await portfolio_service.get_portfolio(db, current_user.id, portfolio_id)
+    holdings = await portfolio_service.get_holdings_with_prices(db, portfolio_id)
+    holdings_data = [
+        {
+            "symbol": h.symbol,
+            "market_value": float(h.market_value) if h.market_value else 0,
+            "total_cost": float(h.total_cost) if h.total_cost else 0,
+            "total_pnl": float(h.total_pnl) if h.total_pnl else 0,
+            "total_pnl_pct": float(h.total_pnl_pct) if h.total_pnl_pct else 0,
+        }
+        for h in holdings
+    ]
+    return await portfolio_advisor_service.get_advisor_analysis(holdings_data)

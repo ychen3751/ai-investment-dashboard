@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router-dom'
 import { router } from './router'
 import { ToastContainer } from './components/ui/Toast'
 import { Spinner } from './components/ui/Spinner'
+import { AIChat } from './components/chat/AIChat'
 import client from './api/client'
 import { useAuthStore } from './store/authStore'
 
@@ -50,6 +51,7 @@ export default function App() {
     <AuthGate>
       <RouterProvider router={router} />
       <ToastContainer />
+      <AIChat />
     </AuthGate>
   )
 }

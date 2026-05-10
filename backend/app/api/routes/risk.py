@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, get_db
 from app.models.user import User
-from app.services import risk_service, portfolio_service
+from app.services import risk_service, portfolio_service, stress_test_service
 
 router = APIRouter()
 
@@ -33,6 +33,16 @@ async def get_correlation(portfolio_id: uuid.UUID, current_user: User = Depends(
     holdings = await portfolio_service.get_holdings_with_prices(db, portfolio_id)
     holdings_data = [{"symbol": h.symbol, "market_value": h.market_value or h.total_cost or 0} for h in holdings]
     return await risk_service.get_correlation_matrix(holdings_data)
+
+
+@router.get("/stress/{portfolio_id}")
+async def get_stress_test(portfolio_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Stress test portfolio under 5 scenarios: Nasdaq crash, rate spike, oil shock,
+    AI correction, and recession.  Educational only — not financial advice."""
+    await portfolio_service.get_portfolio(db, current_user.id, portfolio_id)
+    holdings = await portfolio_service.get_holdings_with_prices(db, portfolio_id)
+    holdings_data = [{"symbol": h.symbol, "market_value": h.market_value or h.total_cost or 0} for h in holdings]
+    return await stress_test_service.run_stress_tests(holdings_data)
 
 
 # ── Legacy POST endpoints (kept for backward compat) ─────────────────────

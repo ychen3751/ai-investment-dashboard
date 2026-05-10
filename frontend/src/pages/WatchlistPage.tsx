@@ -6,7 +6,8 @@ import { Input } from '../components/ui/Input'
 import { Spinner } from '../components/ui/Spinner'
 import { PriceChange } from '../components/shared/PriceChange'
 import { SymbolSearch } from '../components/shared/SymbolSearch'
-import { fetchWatchlists, createWatchlist, deleteWatchlist, addWatchlistItem, removeWatchlistItem } from '../api/watchlists'
+import { fetchWatchlists, createWatchlist, deleteWatchlist, addWatchlistItem, removeWatchlistItem, fetchWatchlistSignals } from '../api/watchlists'
+import { Badge } from '../components/ui/Badge'
 import { Watchlist } from '../types/watchlist'
 import { num, fmtPct, fmtCurrency as fmtCurr } from '../utils/formatters'
 
@@ -27,6 +28,7 @@ export function WatchlistPage() {
   const [addSymbol, setAddSymbol] = useState('')
 
   const { data: watchlists, isLoading } = useQuery({ queryKey: ['watchlists'], queryFn: fetchWatchlists })
+  const { data: signals } = useQuery({ queryKey: ['watchlist-signals'], queryFn: fetchWatchlistSignals })
 
   const activeWatchlist: Watchlist | undefined = watchlists?.find((w) => w.id === activeTab) || watchlists?.[0]
 
@@ -133,6 +135,44 @@ export function WatchlistPage() {
           )}
         </>
       )}
+
+      {/* Watchlist Intelligence */}
+      {signals && signals.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Watchlist Intelligence</h3>
+            <div className="h-px flex-1 bg-gradient-to-r from-gray-800 to-transparent" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {signals.filter((s) => s.signal !== 'insufficient_data' && s.signal !== 'neutral').slice(0, 9).map((s) => {
+              const sigColor = s.signal.includes('bullish') ? 'success' as const : s.signal.includes('bearish') ? 'danger' as const : 'default' as const
+              const momColor = s.momentum_score >= 70 ? '#22c55e' : s.momentum_score >= 40 ? '#eab308' : '#ef4444'
+              return (
+                <div key={s.ticker} className="bg-gray-900/60 rounded-xl border border-gray-800/80 p-3 hover:border-gray-700/80 transition-colors">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-semibold text-gray-200">{s.ticker}</span>
+                    <Badge variant={sigColor}>{s.signal.replace(/_/g, ' ')}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="h-1.5 flex-1 bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${s.momentum_score}%`, background: momColor }} />
+                    </div>
+                    <span className="text-xs font-medium tabular-nums" style={{ color: momColor }}>{s.momentum_score}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 leading-relaxed">{s.summary}</p>
+                  <div className="flex items-center gap-2 mt-1.5 text-[10px] text-gray-600">
+                    <span>RSI: {s.indicators.rsi.toFixed(1)}</span>
+                    <span>MACD: {s.indicators.macd}</span>
+                    {s.indicators.volume_spike && <span className="text-yellow-400">Hi Vol</span>}
+                    <span>Momentum: {s.trend}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

@@ -6,6 +6,8 @@ import { Input } from '../components/ui/Input'
 import { Spinner } from '../components/ui/Spinner'
 import { Badge } from '../components/ui/Badge'
 import { fetchExpirations, fetchOptionChain, fetchFlowAnalysis } from '../api/options'
+import { recommendStrategy } from '../api/strategy'
+import { StrategyBuilder } from '../components/shared/StrategyBuilder'
 import { num, fmtCurrency } from '../utils/formatters'
 import type { OptionContract, FlowAnalysis } from '../api/options'
 
@@ -222,6 +224,17 @@ export function OptionsFlowPage() {
       {chain && chain.contracts.length === 0 && symbol && !isLoading && (
         <Card><p className="text-gray-500 text-sm">No contracts match the current filters.</p></Card>
       )}
+
+      {/* Options Strategy Builder */}
+      <div className="bg-gray-900/80 rounded-xl border border-gray-800 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Strategy Builder</h3>
+          <span className="text-[10px] text-gray-600">Educational — not financial advice</span>
+        </div>
+        <StrategyBuilder />
+      </div>
+
+      <p className="text-xs text-gray-600 mt-2">Options strategy recommendations are for educational purposes only. Not financial advice. Past performance does not guarantee future results.</p>
     </div>
   )
 }

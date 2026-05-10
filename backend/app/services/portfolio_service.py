@@ -127,6 +127,27 @@ async def remove_holding(db: AsyncSession, portfolio_id: uuid.UUID, holding_id: 
     await db.flush()
 
 
+async def update_holding(db: AsyncSession, portfolio_id: uuid.UUID, holding_id: uuid.UUID, quantity: Decimal, avg_cost: Decimal) -> Holding:
+    if quantity <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quantity must be greater than 0")
+    if avg_cost <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Average cost must be greater than 0")
+    result = await db.execute(
+        select(Holding).where(
+            Holding.id == holding_id,
+            Holding.portfolio_id == portfolio_id,
+        )
+    )
+    holding = result.scalar_one_or_none()
+    if not holding:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Holding not found")
+    holding.quantity = quantity
+    holding.average_cost_basis = avg_cost
+    await db.flush()
+    await db.refresh(holding)
+    return holding
+
+
 async def add_transaction(db: AsyncSession, portfolio_id: uuid.UUID, data) -> Transaction:
     transaction = Transaction(
         portfolio_id=portfolio_id,

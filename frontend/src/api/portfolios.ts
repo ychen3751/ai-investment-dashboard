@@ -15,6 +15,7 @@ export interface MarketIndex {
   symbol: string
   name: string
   value: number | null
+  change: number | null
   change_pct: number | null
 }
 
@@ -54,6 +55,11 @@ export async function fetchHoldings(portfolioId: string): Promise<Holding[]> {
 
 export async function addHolding(portfolioId: string, data: HoldingCreate): Promise<Holding> {
   const { data: res } = await client.post(`/portfolios/${portfolioId}/holdings`, data)
+  return res
+}
+
+export async function updateHolding(portfolioId: string, holdingId: string, data: { quantity: number; average_cost_basis: number }): Promise<Holding> {
+  const { data: res } = await client.put(`/portfolios/${portfolioId}/holdings/${holdingId}`, data)
   return res
 }
 

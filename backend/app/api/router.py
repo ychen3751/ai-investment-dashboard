@@ -42,6 +42,7 @@ async def get_dashboard_summary(current_user: User = Depends(get_current_user), 
                 "symbol": i.symbol,
                 "name": i.name,
                 "value": float(i.current_value) if i.current_value else None,
+                "change": float(i.daily_change) if i.daily_change else None,
                 "change_pct": float(i.daily_change_pct) if i.daily_change_pct else None,
             }
             for i in indices

@@ -11,6 +11,11 @@ class HoldingCreate(BaseModel):
     average_cost_basis: Decimal = Field(..., gt=0)
 
 
+class HoldingUpdate(BaseModel):
+    quantity: Decimal = Field(..., gt=0)
+    average_cost_basis: Decimal = Field(..., gt=0)
+
+
 class HoldingResponse(BaseModel):
     id: uuid.UUID
     symbol: str

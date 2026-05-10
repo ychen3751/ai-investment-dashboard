@@ -6,7 +6,7 @@ from typing import List
 from app.core.deps import get_current_user, get_db
 from app.models.user import User
 from app.schemas.portfolio import (
-    PortfolioCreate, PortfolioResponse, HoldingCreate, HoldingResponse,
+    PortfolioCreate, PortfolioResponse, HoldingCreate, HoldingUpdate, HoldingResponse,
     TransactionCreate, TransactionResponse, PerformanceResponse, PortfolioSummary,
 )
 from app.services import portfolio_service
@@ -73,6 +73,16 @@ async def add_holding(portfolio_id: uuid.UUID, data: HoldingCreate, current_user
             return h
 
 
+@router.put("/{portfolio_id}/holdings/{holding_id}", response_model=HoldingResponse)
+async def update_holding(portfolio_id: uuid.UUID, holding_id: uuid.UUID, data: HoldingUpdate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await portfolio_service.get_portfolio(db, current_user.id, portfolio_id)
+    holding = await portfolio_service.update_holding(db, portfolio_id, holding_id, data.quantity, data.average_cost_basis)
+    holdings = await portfolio_service.get_holdings_with_prices(db, portfolio_id)
+    for h in holdings:
+        if h.id == holding.id:
+            return h
+
+
 @router.delete("/{portfolio_id}/holdings/{holding_id}", status_code=204)
 async def remove_holding(portfolio_id: uuid.UUID, holding_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await portfolio_service.get_portfolio(db, current_user.id, portfolio_id)
@@ -98,12 +108,23 @@ async def add_transaction(portfolio_id: uuid.UUID, data: TransactionCreate, curr
 async def get_performance(portfolio_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await portfolio_service.get_portfolio(db, current_user.id, portfolio_id)
     holdings = await portfolio_service.get_holdings_with_prices(db, portfolio_id)
-    prices = []
+    if not holdings:
+        return PerformanceResponse()
+
+    total_value = sum(float(h.market_value or 0) for h in holdings)
+    if total_value <= 0:
+        return PerformanceResponse()
+
+    histories = []
+    weights = []
     for h in holdings:
         history = await portfolio_service.market_data_service.get_history(h.symbol, "1d", "1y")
-        if history:
-            prices.extend([p["close"] for p in history[-252:]])
-    if not prices:
+        if history and len(history) >= 2:
+            histories.append([p["close"] for p in history])
+            weights.append(float(h.market_value or 0) / total_value)
+
+    if not histories:
         return PerformanceResponse()
-    from app.services.performance_service import calculate_performance
-    return calculate_performance(prices)
+
+    from app.services.performance_service import calculate_performance_from_weighted_returns
+    return calculate_performance_from_weighted_returns(histories, weights)

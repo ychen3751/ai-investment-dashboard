@@ -10,11 +10,12 @@ async def get_quote(symbol: str) -> Optional[Dict[str, Any]]:
     try:
         ticker = yf.Ticker(symbol)
         info = ticker.info if hasattr(ticker, 'info') else {}
-        if not info or 'currentPrice' not in info:
+        price = info.get("currentPrice") or info.get("regularMarketPrice")
+        if not info or price is None:
             return None
         return {
             "symbol": symbol.upper(),
-            "price": info.get("currentPrice") or info.get("regularMarketPrice"),
+            "price": price,
             "previous_close": info.get("previousClose") or info.get("regularMarketPreviousClose"),
             "change": info.get("regularMarketChange"),
             "change_pct": info.get("regularMarketChangePercent"),

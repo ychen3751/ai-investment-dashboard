@@ -10,6 +10,8 @@ INDICES = [
     ("QQQ", "Nasdaq 100 ETF"),
     ("DIA", "Dow Jones ETF"),
     ("IWM", "Russell 2000 ETF"),
+    ("^VIX", "CBOE Volatility Index"),
+    ("^TNX", "10-Year Treasury Yield"),
 ]
 
 SECTORS = [

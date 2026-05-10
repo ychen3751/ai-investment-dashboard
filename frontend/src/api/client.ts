@@ -1,7 +1,10 @@
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
 
-const API_BASE_URL = '/api'
+/** In dev (Docker) requests go through the Vite proxy at /api.
+ *  In production (Vercel) the env var VITE_API_BASE_URL must point to your
+ *  Railway backend, e.g. https://your-app.railway.app/api. */
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const client = axios.create({
   baseURL: API_BASE_URL,

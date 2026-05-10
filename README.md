@@ -16,6 +16,11 @@
     <img src="https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white" alt="Vite"/>
     <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white" alt="Docker"/>
     <img src="https://img.shields.io/badge/lightweight--charts-5-FFB300?logo=tradingview&logoColor=white" alt="TradingView Charts"/>
+    <br/>
+    <img src="https://img.shields.io/badge/ESLint-4B32C3?logo=eslint&logoColor=white" alt="ESLint"/>
+    <img src="https://img.shields.io/badge/Prettier-F7B93E?logo=prettier&logoColor=black" alt="Prettier"/>
+    <img src="https://img.shields.io/badge/pytest-0A9EDC?logo=pytest&logoColor=white" alt="pytest"/>
+    <img src="https://img.shields.io/badge/CI-GitHub_Actions-2088FF?logo=githubactions&logoColor=white" alt="CI"/>
   </p>
   <br/>
 </div>
@@ -275,6 +280,75 @@ npm install
 
 # Start development server
 npm run dev
+```
+
+---
+
+## 🌐 Deployment
+
+### Frontend (Vercel)
+
+The frontend is a standard Vite + React SPA and deploys to Vercel with zero config.
+
+```bash
+# 1. Install Vercel CLI and log in
+npm i -g vercel && vercel login
+
+# 2. Deploy from the frontend directory
+cd frontend
+vercel --prod
+
+# 3. Set the production API URL
+vercel env add VITE_API_BASE_URL
+# → https://your-backend.railway.app/api
+```
+
+The `vercel.json` at the project root handles SPA fallback routing automatically.
+
+**Required environment variable:**
+
+| Variable | Example | Purpose |
+|---|---|---|
+| `VITE_API_BASE_URL` | `https://api.investment-dashboard.com/api` | Backend API base URL |
+
+### Backend (Railway)
+
+```bash
+# 1. Install Railway CLI
+npm i -g @railway/cli && railway login
+
+# 2. Deploy from the backend directory
+cd backend
+railway init
+railway up
+
+# 3. Provision PostgreSQL
+railway add postgresql
+
+# 4. Set required environment variables
+railway env set SECRET_KEY=$(openssl rand -hex 32)
+railway env set DEBUG=false
+railway env set CORS_ORIGINS=https://your-frontend.vercel.app
+```
+
+**Required environment variables:**
+
+| Variable | Required | Notes |
+|---|---|---|
+| `DATABASE_URL` | ✅ | Set automatically by Railway PostgreSQL plugin |
+| `SECRET_KEY` | ✅ | Generate with `openssl rand -hex 32` |
+| `CORS_ORIGINS` | ✅ | Your Vercel frontend URL |
+| `REDIS_URL` | ❌ | Optional — cache degrades gracefully |
+| `DEBUG` | ❌ | Set `false` for production error handling |
+
+The backend uses `$PORT` (set automatically by Railway) and waits for the database
+to become available before accepting connections (up to 5 retries with 3s delay).
+
+### Health Check
+
+```
+GET /health
+→ {"status":"ok","app":"AI Investment Dashboard","debug":false}
 ```
 
 ---

@@ -1,3 +1,4 @@
+import asyncio
 import yfinance as yf
 import pandas as pd
 from typing import Any, Dict, List, Optional
@@ -68,33 +69,34 @@ async def get_info(symbol: str) -> Dict[str, Any]:
 
 
 async def get_options_chain(symbol: str, expiration: Optional[str] = None) -> Dict[str, Any]:
-    limiter = get_rate_limiter("yfinance")
-    await limiter.wait()
+    await asyncio.sleep(0.5)  # gentle throttle instead of rate limiter
     try:
         ticker = yf.Ticker(symbol)
         if expiration:
             chain = ticker.option_chain(expiration)
         else:
-            expirations = ticker.options
-            if not expirations:
+            exps = ticker.options
+            if not exps:
                 return {"calls": [], "puts": []}
-            chain = ticker.option_chain(expirations[0])
+            chain = ticker.option_chain(exps[0])
 
         def parse_contracts(df: pd.DataFrame) -> List[Dict]:
             contracts = []
             for _, row in df.iterrows():
-                contracts.append({
-                    "strike": float(row["strike"]),
-                    "expiration": str(row["expiration"]) if hasattr(row["expiration"], 'isoformat') else str(row["expiration"]),
-                    "last_price": float(row["lastPrice"]),
-                    "bid": float(row["bid"]),
-                    "ask": float(row["ask"]),
-                    "volume": int(row["volume"]),
-                    "open_interest": int(row["openInterest"]),
-                    "implied_volatility": float(row["impliedVolatility"]),
-                    "premium": float(row["lastPrice"]) * int(row["volume"]) if row["volume"] > 0 else 0,
-                    "volume_oi_ratio": round(int(row["volume"]) / max(int(row["openInterest"]), 1), 4),
-                })
+                try:
+                    contracts.append({
+                        "strike": float(row["strike"]),
+                        "last_price": float(row["lastPrice"]),
+                        "bid": float(row["bid"]),
+                        "ask": float(row["ask"]),
+                        "volume": int(row["volume"]),
+                        "open_interest": int(row["openInterest"]),
+                        "implied_volatility": float(row["impliedVolatility"]),
+                        "premium": float(row["lastPrice"]) * int(row["volume"]) if row["volume"] > 0 else 0,
+                        "volume_oi_ratio": round(int(row["volume"]) / max(int(row["openInterest"]), 1), 4),
+                    })
+                except Exception:
+                    continue
             return contracts
 
         return {

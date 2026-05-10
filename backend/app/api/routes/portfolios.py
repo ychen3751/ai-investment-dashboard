@@ -9,7 +9,8 @@ from app.schemas.portfolio import (
     PortfolioCreate, PortfolioResponse, HoldingCreate, HoldingUpdate, HoldingResponse,
     TransactionCreate, TransactionResponse, PerformanceResponse, PortfolioSummary,
 )
-from app.services import portfolio_service
+from app.schemas.option_position import OptionPositionCreate, OptionPositionUpdate, OptionPositionResponse
+from app.services import portfolio_service, option_service
 
 router = APIRouter()
 
@@ -128,3 +129,50 @@ async def get_performance(portfolio_id: uuid.UUID, current_user: User = Depends(
 
     from app.services.performance_service import calculate_performance_from_weighted_returns
     return calculate_performance_from_weighted_returns(histories, weights)
+
+
+@router.get("/{portfolio_id}/insights")
+async def get_portfolio_insights(portfolio_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Natural-language portfolio analysis."""
+    await portfolio_service.get_portfolio(db, current_user.id, portfolio_id)
+    holdings = await portfolio_service.get_holdings_with_prices(db, portfolio_id)
+    holdings_data = [
+        {
+            "symbol": h.symbol,
+            "market_value": float(h.market_value) if h.market_value else 0,
+            "total_cost": float(h.total_cost) if h.total_cost else 0,
+            "total_pnl": float(h.total_pnl) if h.total_pnl else 0,
+            "total_pnl_pct": float(h.total_pnl_pct) if h.total_pnl_pct else 0,
+            "day_change_pct": float(h.day_change_pct) if h.day_change_pct else 0,
+        }
+        for h in holdings
+    ]
+    from app.services.insights_service import get_portfolio_insights as compute_insights
+    return await compute_insights(holdings_data)
+
+
+# ─── Options ─────────────────────────────────────────────────────────────
+
+
+@router.get("/{portfolio_id}/options", response_model=List[OptionPositionResponse])
+async def list_options(portfolio_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await portfolio_service.get_portfolio(db, current_user.id, portfolio_id)
+    return await option_service.list_options(db, portfolio_id)
+
+
+@router.post("/{portfolio_id}/options", response_model=OptionPositionResponse, status_code=201)
+async def create_option(portfolio_id: uuid.UUID, data: OptionPositionCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await portfolio_service.get_portfolio(db, current_user.id, portfolio_id)
+    return await option_service.create_option(db, portfolio_id, data)
+
+
+@router.put("/{portfolio_id}/options/{option_id}", response_model=OptionPositionResponse)
+async def update_option(portfolio_id: uuid.UUID, option_id: uuid.UUID, data: OptionPositionUpdate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await portfolio_service.get_portfolio(db, current_user.id, portfolio_id)
+    return await option_service.update_option(db, portfolio_id, option_id, data)
+
+
+@router.delete("/{portfolio_id}/options/{option_id}", status_code=204)
+async def delete_option(portfolio_id: uuid.UUID, option_id: uuid.UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await portfolio_service.get_portfolio(db, current_user.id, portfolio_id)
+    await option_service.delete_option(db, portfolio_id, option_id)

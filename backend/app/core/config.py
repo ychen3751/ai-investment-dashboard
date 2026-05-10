@@ -1,6 +1,6 @@
-from pydantic_settings import BaseSettings
-from typing import List
 import os
+from typing import List
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://investor:changeme@localhost:5432/investment_dashboard"
     DATABASE_URL_SYNC: str = "postgresql://investor:changeme@localhost:5432/investment_dashboard"
 
-    # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
+    # Redis (optional in production — falls back gracefully if not set)
+    REDIS_URL: str = ""
 
     # Auth
     SECRET_KEY: str = "dev-secret-key-change-in-production"
@@ -29,12 +29,17 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     POLYGON_API_KEY: str = ""
 
-    # CORS
+    # CORS — comma-separated origins, or "*" to allow all (not recommended for production)
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
 
     @property
     def cors_origin_list(self) -> List[str]:
-        return [o.strip() for o in self.CORS_ORIGINS.split(",")]
+        origins = [o.strip() for o in self.CORS_ORIGINS.split(",")]
+        return origins if origins != ["*"] else ["*"]
+
+    @property
+    def is_production(self) -> bool:
+        return not self.DEBUG
 
     model_config = {"env_file": ".env", "case_sensitive": True}
 

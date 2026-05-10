@@ -8,7 +8,9 @@ import { Input } from '../components/ui/Input'
 import { Spinner } from '../components/ui/Spinner'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { toast } from '../components/ui/Toast'
-import { fetchPortfolio, fetchHoldings, addHolding, updateHolding, removeHolding, deletePortfolio, fetchPerformance } from '../api/portfolios'
+import { fetchPortfolio, fetchHoldings, addHolding, updateHolding, removeHolding, deletePortfolio, fetchPerformance, fetchPortfolioInsights, fetchOptions, createOption, updateOption, deleteOption } from '../api/portfolios'
+import type { OptionPosition } from '../types/option'
+import { Badge } from '../components/ui/Badge'
 import { PriceChange } from '../components/shared/PriceChange'
 import { num, fmtPct, fmtCurrency } from '../utils/formatters'
 import type { Holding } from '../types/portfolio'
@@ -49,6 +51,19 @@ export function PortfolioDetailPage() {
   const [editState, setEditState] = useState<EditState | null>(null)
   const [confirmDeleteHolding, setConfirmDeleteHolding] = useState<string | null>(null)
   const [confirmDeletePortfolio, setConfirmDeletePortfolio] = useState(false)
+  const [activeTab, setActiveTab] = useState<'stocks' | 'options'>('stocks')
+
+  // Options form state
+  const [optSymbol, setOptSymbol] = useState('')
+  const [optType, setOptType] = useState<'call' | 'put'>('call')
+  const [optSide, setOptSide] = useState<'long' | 'short'>('long')
+  const [optStrike, setOptStrike] = useState('')
+  const [optExpiry, setOptExpiry] = useState('')
+  const [optContracts, setOptContracts] = useState('')
+  const [optPremium, setOptPremium] = useState('')
+  const [optEditId, setOptEditId] = useState<string | null>(null)
+  const [optFormOpen, setOptFormOpen] = useState(false)
+  const [optFormError, setOptFormError] = useState('')
 
   const { data: portfolio, isLoading: ploading } = useQuery({
     queryKey: ['portfolio', id],
@@ -59,10 +74,21 @@ export function PortfolioDetailPage() {
     queryKey: ['holdings', id],
     queryFn: () => fetchHoldings(id!),
     enabled: !!id,
+    refetchInterval: 30_000,
   })
   const { data: perf } = useQuery({
     queryKey: ['performance', id],
     queryFn: () => fetchPerformance(id!),
+    enabled: !!id,
+  })
+  const { data: insights } = useQuery({
+    queryKey: ['insights', id],
+    queryFn: () => fetchPortfolioInsights(id!),
+    enabled: !!id,
+  })
+  const { data: options, isLoading: optsLoading } = useQuery({
+    queryKey: ['options', id],
+    queryFn: () => fetchOptions(id!),
     enabled: !!id,
   })
 
@@ -70,6 +96,8 @@ export function PortfolioDetailPage() {
     qc.invalidateQueries({ queryKey: ['holdings', id] })
     qc.invalidateQueries({ queryKey: ['portfolio', id] })
     qc.invalidateQueries({ queryKey: ['performance', id] })
+    qc.invalidateQueries({ queryKey: ['insights', id] })
+    qc.invalidateQueries({ queryKey: ['options', id] })
   }, [qc, id])
 
   const addHoldingMut = useMutation({
@@ -120,6 +148,31 @@ export function PortfolioDetailPage() {
       toast(extractError(error), 'error')
       setConfirmDeleteHolding(null)
     },
+  })
+
+  const createOptMut = useMutation({
+    mutationFn: () => createOption(id!, {
+      underlying_symbol: optSymbol.toUpperCase().trim(),
+      option_type: optType, side: optSide,
+      strike_price: parseFloat(optStrike),
+      expiration_date: optExpiry,
+      contracts: parseInt(optContracts),
+      premium_per_contract: parseFloat(optPremium),
+    }),
+    onSuccess: () => { invalidateAll(); setOptFormOpen(false); clearOptForm(); toast('Option added', 'success') },
+    onError: (error: Error) => { setOptFormError(extractError(error)) },
+  })
+
+  const updateOptMut = useMutation({
+    mutationFn: () => updateOption(id!, optEditId!, { contracts: parseInt(optContracts), premium_per_contract: parseFloat(optPremium) }),
+    onSuccess: () => { invalidateAll(); setOptEditId(null); clearOptForm(); toast('Option updated', 'success') },
+    onError: (error: Error) => { setOptFormError(extractError(error)) },
+  })
+
+  const deleteOptMut = useMutation({
+    mutationFn: (oid: string) => deleteOption(id!, oid),
+    onSuccess: () => { invalidateAll(); toast('Option removed', 'success') },
+    onError: (error: Error) => { toast(extractError(error), 'error') },
   })
 
   const deletePortfolioMut = useMutation({
@@ -176,6 +229,12 @@ export function PortfolioDetailPage() {
   const cancelEdit = () => {
     setEditState(null)
     setErrors({})
+  }
+
+  const clearOptForm = () => {
+    setOptSymbol(''); setOptType('call'); setOptSide('long')
+    setOptStrike(''); setOptExpiry(''); setOptContracts(''); setOptPremium('')
+    setOptFormError('')
   }
 
   const saveEdit = () => {
@@ -247,7 +306,54 @@ export function PortfolioDetailPage() {
         </div>
       )}
 
-      {/* Holdings */}
+      {/* Insights */}
+      {insights !== null && insights !== undefined && (() => {
+        const raw = (insights ?? {}) as Record<string, unknown>
+        const cards = Object.entries(raw).filter(([k]) => k !== 'ai_enriched' && k !== 'ai_summary') as Array<[string, { label: string; summary: string; detail?: string; severity: string }]>
+        const aiSummary = raw.ai_summary as string | undefined
+        return (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Portfolio Insights</h3>
+              <div className="h-px flex-1 bg-gradient-to-r from-gray-800 to-transparent" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {cards.map(([key, i]) => {
+                const sc = i.severity === 'high' ? 'border-l-red-500/60' : i.severity === 'medium' ? 'border-l-yellow-500/60' : i.severity === 'positive' ? 'border-l-green-500/60' : 'border-l-gray-600/40'
+                const bv = i.severity === 'high' ? 'danger' as const : i.severity === 'positive' ? 'success' as const : i.severity === 'medium' ? 'warning' as const : 'default' as const
+                return (
+                  <div key={key} className={`bg-gray-900/60 rounded-xl border border-gray-800/80 border-l-4 ${sc} p-4`}>
+                    <div className="flex items-center gap-2 mb-1.5"><Badge variant={bv}>{i.label}</Badge></div>
+                    <p className="text-sm text-gray-300 leading-relaxed">{i.summary}</p>
+                    {i.detail && <p className="text-xs text-gray-600 mt-1.5">{i.detail}</p>}
+                  </div>
+                )
+              })}
+            </div>
+            {aiSummary && (
+              <div className="mt-3 p-3 bg-primary-600/5 border border-primary-800/20 rounded-xl">
+                <p className="text-xs text-gray-500 mb-1">AI Summary</p>
+                <p className="text-sm text-gray-300 leading-relaxed">{aiSummary}</p>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* Tabs: Stocks | Options */}
+      <div className="flex gap-1 border-b border-gray-800 pb-0">
+        <button onClick={() => setActiveTab('stocks')}
+          className={`px-4 py-2 text-sm font-medium rounded-t transition-colors ${activeTab === 'stocks' ? 'bg-gray-800 text-gray-100 border-b-2 border-primary-500' : 'text-gray-500 hover:text-gray-300'}`}>
+          Stocks {holdings && holdings.length > 0 ? `(${holdings.length})` : ''}
+        </button>
+        <button onClick={() => setActiveTab('options')}
+          className={`px-4 py-2 text-sm font-medium rounded-t transition-colors ${activeTab === 'options' ? 'bg-gray-800 text-gray-100 border-b-2 border-primary-500' : 'text-gray-500 hover:text-gray-300'}`}>
+          Options {options && options.length > 0 ? `(${options.length})` : ''}
+        </button>
+      </div>
+
+      {/* ── Stocks Tab ───────────────────────────────────────────── */}
+      {activeTab === 'stocks' && (
       <Card title="Holdings">
         <div className="mb-3 flex items-center gap-3">
           <Button size="sm" onClick={showForm ? closeForm : openForm} disabled={!!editState || isMutating}>
@@ -257,7 +363,6 @@ export function PortfolioDetailPage() {
           {updateHoldingMut.isPending && <span className="text-xs text-gray-500">Saving...</span>}
         </div>
 
-        {/* Add Holding Form */}
         {showForm && (
           <div className="flex flex-col gap-3 mb-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
             <div>
@@ -369,6 +474,99 @@ export function PortfolioDetailPage() {
           </div>
         )}
       </Card>
+      )}
+
+      {/* Options Tab */}
+      {activeTab === 'options' && (
+      <Card title="Options Positions">
+        <div className="mb-3">
+          <Button size="sm" onClick={() => { setOptFormOpen(!optFormOpen); clearOptForm() }} disabled={isMutating}>{optFormOpen ? 'Cancel' : 'Add Option'}</Button>
+        </div>
+        {optFormOpen && (
+          <div className="flex flex-col gap-3 mb-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
+            <Input label="Underlying" value={optSymbol} onChange={(e) => setOptSymbol(e.target.value.toUpperCase())} placeholder="AAPL" />
+            <div className="flex gap-2">
+              <select value={optType} onChange={(e) => setOptType(e.target.value as 'call' | 'put')}
+                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100">
+                <option value="call">Call</option><option value="put">Put</option>
+              </select>
+              <select value={optSide} onChange={(e) => setOptSide(e.target.value as 'long' | 'short')}
+                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100">
+                <option value="long">Long</option><option value="short">Short</option>
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <Input label="Strike ($)" type="number" value={optStrike} onChange={(e) => setOptStrike(e.target.value)} placeholder="300" min="0" step="any" />
+              <Input label="Expiration" type="date" value={optExpiry} onChange={(e) => setOptExpiry(e.target.value)} />
+            </div>
+            <div className="flex gap-2">
+              <Input label="Contracts" type="number" value={optContracts} onChange={(e) => setOptContracts(e.target.value)} placeholder="1" min="1" step="1" />
+              <Input label="Premium/contract ($)" type="number" value={optPremium} onChange={(e) => setOptPremium(e.target.value)} placeholder="5.00" min="0" step="any" />
+            </div>
+            {optFormError && <p className="text-xs text-red-400">{optFormError}</p>}
+            <Button onClick={() => {
+              if (!optSymbol || !optStrike || !optExpiry || !optContracts || !optPremium) {
+                setOptFormError('All fields required'); return
+              }
+              setOptFormError('')
+              optEditId ? updateOptMut.mutate() : createOptMut.mutate()
+            }} disabled={createOptMut.isPending || updateOptMut.isPending}>
+              {optEditId ? 'Update' : 'Add Option'}
+            </Button>
+          </div>
+        )}
+        {optsLoading ? <Spinner /> : !options || options.length === 0 ? (
+          <p className="text-gray-500 text-sm">No option positions.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-800 text-gray-500">
+                  <th className="text-left py-2 px-2">Symbol</th>
+                  <th className="text-left py-2 px-2">Type/Side</th>
+                  <th className="text-right py-2 px-2">Strike</th>
+                  <th className="text-right py-2 px-2">Expiry</th>
+                  <th className="text-right py-2 px-2">Ctr</th>
+                  <th className="text-right py-2 px-2">Premium</th>
+                  <th className="text-right py-2 px-2">Price</th>
+                  <th className="text-right py-2 px-2">Mkt Val</th>
+                  <th className="text-right py-2 px-2">P&L</th>
+                  <th className="text-center py-2 px-2">Status</th>
+                  <th className="py-2 px-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {options.map((o: OptionPosition) => (
+                  <tr key={o.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                    <td className="py-2 px-2 font-medium">{o.underlying_symbol}</td>
+                    <td className="py-2 px-2">
+                      <Badge variant={o.option_type === 'call' ? 'success' : 'danger'}>{o.option_type.toUpperCase()}</Badge>
+                      <span className="ml-1 text-xs text-gray-500">{o.side.toUpperCase()}</span>
+                    </td>
+                    <td className="py-2 px-2 text-right tabular-nums">${num(o.strike_price).toFixed(2)}</td>
+                    <td className="py-2 px-2 text-right tabular-nums text-xs">{o.expiration_date}</td>
+                    <td className="py-2 px-2 text-right tabular-nums">{o.contracts}</td>
+                    <td className="py-2 px-2 text-right tabular-nums">${num(o.premium_per_contract).toFixed(2)}</td>
+                    <td className="py-2 px-2 text-right tabular-nums">{o.current_price ? `$${num(o.current_price).toFixed(2)}` : '—'}</td>
+                    <td className="py-2 px-2 text-right tabular-nums">{o.market_value != null ? `$${num(o.market_value).toFixed(0)}` : '—'}</td>
+                    <td className={`py-2 px-2 text-right tabular-nums ${num(o.unrealized_pnl) >= 0 ? 'text-gain' : 'text-loss'}`}>
+                      {o.unrealized_pnl != null ? `${num(o.unrealized_pnl) >= 0 ? '+' : ''}$${num(o.unrealized_pnl).toFixed(0)}` : '—'}
+                    </td>
+                    <td className="py-2 px-2 text-center">
+                      {o.status ? <Badge variant={o.status === 'ITM' ? 'success' : o.status === 'OTM' ? 'default' : 'warning'}>{o.status}</Badge> : '—'}
+                    </td>
+                    <td className="py-2 px-2 text-right">
+                      <Button variant="ghost" size="sm" onClick={() => deleteOptMut.mutate(o.id)} disabled={isMutating} title="Delete">✕</Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+      )}
+
     </div>
   )
 }

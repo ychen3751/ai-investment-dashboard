@@ -15,5 +15,6 @@ class Portfolio(UUIDMixin, TimestampMixin, Base):
 
     user = relationship("User", back_populates="portfolios")
     holdings = relationship("Holding", back_populates="portfolio", cascade="all, delete-orphan")
+    option_positions = relationship("OptionPosition", back_populates="portfolio", cascade="all, delete-orphan")
     transactions = relationship("Transaction", back_populates="portfolio", cascade="all, delete-orphan")
     risk_calculations = relationship("RiskCalculation", back_populates="portfolio", cascade="all, delete-orphan")

@@ -4,9 +4,49 @@ from typing import Optional
 
 from app.core.deps import get_current_user, get_db
 from app.models.user import User
+from app.services import options_chain_service, options_analysis_service
 from app.services import options_service
 
 router = APIRouter()
+
+
+@router.get("/expirations")
+async def get_expirations(symbol: str = Query(...)):
+    """Available option expiration dates for a symbol."""
+    return await options_chain_service.get_expirations(symbol)
+
+
+@router.get("/chain")
+async def get_option_chain(
+    symbol: str = Query(...),
+    expiration: Optional[str] = None,
+    min_premium: float = Query(0, ge=0),
+    option_type: Optional[str] = Query(None, pattern="^(call|put)$"),
+    unusual_only: bool = False,
+):
+    """Option chain with unusual activity scoring for each contract.
+
+    Scores range 0–100 based on volume/OI ratio, premium, moneyness,
+    and time to expiration.  Data sourced from Yahoo Finance (delayed).
+    """
+    return await options_chain_service.get_chain_with_scores(
+        symbol, expiration, min_premium, option_type, unusual_only
+    )
+
+
+@router.get("/flow/analysis")
+async def get_flow_analysis(symbol: str = Query(...)):
+    """AI-style options flow analysis for a ticker.
+
+    Computes aggregate metrics (call/put volume, premium, IV, unusual activity)
+    and applies a rule-based engine to determine bullish/bearish/neutral/mixed
+    signal with supporting factors.  Educational purposes only — not financial
+    advice.
+    """
+    return await options_analysis_service.get_flow_analysis(symbol)
+
+
+# ── Legacy persistence-based endpoints (DB-backed) ───────────────────────
 
 
 @router.get("/flow")
@@ -19,6 +59,7 @@ async def get_options_flow(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Previously scanned unusual flow (persisted in DB)."""
     flows = await options_service.get_flow(db, symbol, min_score, option_type, limit, offset)
     return [
         {

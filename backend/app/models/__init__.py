@@ -13,10 +13,12 @@ from app.models.options_flow import OptionsFlow
 from app.models.earnings import EarningsCalendar, EarningsReport
 from app.models.macro import MarketIndex, SectorPerformance, EconomicIndicator
 from app.models.risk_calculation import RiskCalculation
+from app.models.option_position import OptionPosition
 
 __all__ = [
     "Base", "User", "RefreshToken", "Portfolio", "Holding", "Transaction",
     "Watchlist", "WatchlistItem", "Alert", "StockAnalysis", "ChatMessage",
     "OptionsFlow", "EarningsCalendar", "EarningsReport",
     "MarketIndex", "SectorPerformance", "EconomicIndicator", "RiskCalculation",
+    "OptionPosition",
 ]

@@ -228,7 +228,9 @@ async def get_holdings_with_prices(db: AsyncSession, portfolio_id: uuid.UUID) ->
 
 async def get_portfolio_summary(db: AsyncSession, user_id: uuid.UUID) -> PortfolioSummary:
     result = await db.execute(
-        select(Portfolio).where(Portfolio.user_id == user_id).options(selectinload(Portfolio.holdings))
+        select(Portfolio).where(Portfolio.user_id == user_id).options(
+            selectinload(Portfolio.holdings), selectinload(Portfolio.option_positions)
+        )
     )
     portfolios = result.scalars().all()
 
@@ -248,6 +250,17 @@ async def get_portfolio_summary(db: AsyncSession, user_id: uuid.UUID) -> Portfol
                 total_value += mv
                 day_pnl += Decimal(str(quote.get("change", 0))) * Decimal(str(h.quantity))
                 await market_data_service.add_tracked_symbol(h.symbol)
+
+        # Option positions
+        for opt in p.option_positions:
+            contracts = int(opt.contracts)
+            premium = float(opt.premium_per_contract)
+            if opt.side == "long":
+                total_cost += Decimal(str(premium * contracts * 100))
+            try:
+                chain = await market_data_service.get_info(opt.underlying_symbol)
+            except Exception:
+                pass  # option pricing best-effort
 
     return PortfolioSummary(
         total_value=total_value,

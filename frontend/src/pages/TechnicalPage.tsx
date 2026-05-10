@@ -7,7 +7,8 @@ import { SymbolSearch } from '../components/shared/SymbolSearch'
 import { CandlestickChart } from '../components/charts/CandlestickChart'
 import { LineChart } from '../components/charts/LineChart'
 import { fetchTechnicalAnalysis } from '../api/technical'
-import { num } from '../utils/formatters'
+import { useQuote } from '../hooks/useMarketData'
+import { num, fmtCurrency } from '../utils/formatters'
 import type { TechnicalSignal } from '../types/technical'
 
 const RANGES = [
@@ -41,6 +42,9 @@ export function TechnicalPage() {
     queryFn: () => fetchTechnicalAnalysis(symbol, '1d', range),
     enabled: !!symbol,
   })
+
+  const { data: liveQuote } = useQuote(symbol)
+  const lastPrice = liveQuote?.price ?? (data?.prices ? data.prices[data.prices.length - 1] : null)
 
   const bullishCount = useMemo(
     () => data?.signals?.filter((s: TechnicalSignal) => s.signal === 'bullish').length ?? 0,
@@ -85,10 +89,20 @@ export function TechnicalPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-2xl font-bold">Technical Analysis</h2>
-          {symbol && data && (
-            <p className="text-sm text-gray-500 mt-1">
-              {data.symbol} &middot; {data.prices.length} data points &middot;
-              Last: <span className="text-gray-300 font-medium">${num(data.prices[data.prices.length - 1]).toFixed(2)}</span>
+          {symbol && (
+            <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-gain animate-pulse" />
+              {data?.symbol || symbol.toUpperCase()}
+              {lastPrice != null && (
+                <span className="text-gray-300 font-medium tabular-nums">{fmtCurrency(lastPrice)}</span>
+              )}
+              <span className="text-gray-600">&middot;</span>
+              <span>{data?.prices.length || 0} data points</span>
+              {liveQuote?.change != null && (
+                <span className={liveQuote.change >= 0 ? 'text-gain' : 'text-loss'}>
+                  {liveQuote.change >= 0 ? '+' : ''}{liveQuote.change.toFixed(2)} ({liveQuote.change_pct?.toFixed(2) ?? ''}%)
+                </span>
+              )}
             </p>
           )}
         </div>

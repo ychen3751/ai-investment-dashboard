@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/vercel/vercel/main/packages/vercel-json/schema.json",
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

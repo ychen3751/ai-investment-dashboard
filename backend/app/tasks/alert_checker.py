@@ -3,7 +3,22 @@ from sqlalchemy import select
 
 from app.db.session import async_session_factory
 from app.models.alert import Alert
-from app.services.alert_service import check_price_alert, check_volume_alert
+from app.services.alert_service import (
+    check_price_alert,
+    check_daily_pct_alert,
+    check_volume_alert,
+    check_rsi_alert,
+)
+
+
+ALERT_DISPATCH = {
+    "price_above": check_price_alert,
+    "price_below": check_price_alert,
+    "daily_pct_change": check_daily_pct_alert,
+    "volume_surge": check_volume_alert,
+    "rsi_above": check_rsi_alert,
+    "rsi_below": check_rsi_alert,
+}
 
 
 async def check_active_alerts():
@@ -14,16 +29,14 @@ async def check_active_alerts():
             alerts = result.scalars().all()
 
             for alert in alerts:
-                triggered = False
-                if alert.alert_type in ("price_above", "price_below"):
-                    triggered = await check_price_alert(alert.symbol, alert.condition)
-                elif alert.alert_type == "volume_surge":
-                    triggered = await check_volume_alert(alert.symbol, alert.condition)
+                checker = ALERT_DISPATCH.get(alert.alert_type)
+                if checker is None:
+                    continue
 
+                triggered = await checker(alert.symbol, alert.condition)
                 alert.last_checked_at = datetime.now(timezone.utc)
                 if triggered:
                     alert.triggered_at = datetime.now(timezone.utc)
-                    print(f"Alert triggered: {alert.symbol} - {alert.alert_type}")
 
             await db.commit()
         except Exception:

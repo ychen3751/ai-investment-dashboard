@@ -72,6 +72,36 @@ export async function fetchTransactions(portfolioId: string): Promise<Transactio
   return data
 }
 
+import { OptionPosition, OptionPositionCreate, OptionPositionUpdate } from '../types/option'
+
+export async function fetchPortfolioInsights(portfolioId: string): Promise<Record<string, { label: string; summary: string; detail?: string; severity: string }>> {
+  const { data } = await client.get(`/portfolios/${portfolioId}/insights`)
+  return data
+}
+
+// ─── Options ──────────────────────────────────────────────────────────
+
+export async function fetchOptions(portfolioId: string): Promise<OptionPosition[]> {
+  const { data } = await client.get(`/portfolios/${portfolioId}/options`)
+  return data
+}
+
+export async function createOption(portfolioId: string, data: OptionPositionCreate): Promise<OptionPosition> {
+  const { data: res } = await client.post(`/portfolios/${portfolioId}/options`, data)
+  return res
+}
+
+export async function updateOption(portfolioId: string, optionId: string, data: OptionPositionUpdate): Promise<OptionPosition> {
+  const { data: res } = await client.put(`/portfolios/${portfolioId}/options/${optionId}`, data)
+  return res
+}
+
+export async function deleteOption(portfolioId: string, optionId: string): Promise<void> {
+  await client.delete(`/portfolios/${portfolioId}/options/${optionId}`)
+}
+
+// ─── Transactions ──────────────────────────────────────────────────────
+
 export async function addTransaction(portfolioId: string, data: TransactionCreate): Promise<Transaction> {
   const { data: res } = await client.post(`/portfolios/${portfolioId}/transactions`, data)
   return res

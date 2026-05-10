@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 class AlertCreate(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=10)
-    alert_type: str = Field(..., pattern="^(price_above|price_below|volume_surge|technical_cross|options_flow_spike)$")
+    alert_type: str = Field(..., pattern="^(price_above|price_below|daily_pct_change|volume_surge|rsi_above|rsi_below)$")
     condition: dict
 
 

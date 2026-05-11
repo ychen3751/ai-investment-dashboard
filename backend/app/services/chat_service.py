@@ -150,61 +150,242 @@ async def get_chat_response(
 # ── Intent handlers ──────────────────────────────────────────────────────
 
 async def _ticker_analysis(ticker: str) -> str:
-    """Full ticker analysis with real backend data."""
+    """Institutional-quality ticker analysis using real backend data."""
+    # ── Gather data from multiple services ─────────────────────────────
+    quote = None
+    ta = None
+    fundamentals = None
+    options_flow = None
+    earnings = None
+
     try:
         from app.services import market_data_service
         quote = await market_data_service.get_quote(ticker)
-        price = float(quote["price"]) if quote and quote.get("price") else None
-        change = float(quote["change_pct"]) if quote and quote.get("change_pct") else None
-        name = quote.get("name", ticker) if quote else ticker
-    except Exception:
-        price, change, name = None, None, ticker
-
-    # Technical data
-    rsi_val, macd_sig, trend = None, None, None
-    try:
-        from app.services.technical_service import get_combined_analysis
-        ta = await get_combined_analysis(ticker, "1d", "3mo")
-        if ta and "rsi_14" in ta and ta["rsi_14"]:
-            rsi_val = ta["rsi_14"][-1]
-            if ta.get("signals"):
-                signals = ta["signals"]
-                for s in signals:
-                    if "uptrend" in s.get("message","").lower() or "golden" in s.get("message","").lower():
-                        trend = "uptrend"
-                    elif "downtrend" in s.get("message","").lower() or "death" in s.get("message","").lower():
-                        trend = "downtrend"
     except Exception:
         pass
 
-    lines = [f"**{name} ({ticker}) Analysis**"]
-    if price is not None:
-        lines.append(f"Current price: **${price:.2f}** {f'({change:+.2f}%)' if change else ''}")
+    try:
+        from app.services.technical_service import get_combined_analysis
+        ta = await get_combined_analysis(ticker, "1d", "3mo")
+    except Exception:
+        pass
+
+    try:
+        from app.services.market_service import get_fundamentals
+        fundamentals = await get_fundamentals(ticker)
+    except Exception:
+        pass
+
+    try:
+        from app.services.options_analysis_service import get_flow_analysis
+        options_flow = await get_flow_analysis(ticker)
+    except Exception:
+        pass
+
+    try:
+        from app.services.earnings_analysis_service import get_earnings_analysis
+        earnings = await get_earnings_analysis(ticker)
+    except Exception:
+        pass
+
+    # ── Extract values ─────────────────────────────────────────────────
+    price = float(quote["price"]) if quote and quote.get("price") else None
+    change = float(quote["change_pct"]) if quote and quote.get("change_pct") else None
+    name = quote.get("name", ticker) if quote else ticker
+    market_cap = fundamentals.get("valuation", {}).get("market_cap") if fundamentals else None
+    sector = fundamentals.get("company", {}).get("sector") if fundamentals else None
+    beta = fundamentals.get("price", {}).get("beta") if fundamentals else None
+    pe = fundamentals.get("valuation", {}).get("pe_ratio_ttm") if fundamentals else None
+    target = fundamentals.get("price", {}).get("target_mean") if fundamentals else None
+    high_52w = fundamentals.get("price", {}).get("52w_high") if fundamentals else None
+    low_52w = fundamentals.get("price", {}).get("52w_low") if fundamentals else None
+
+    closes = ta.get("prices", []) if ta else []
+    rsi_val = ta["rsi_14"][-1] if ta and ta.get("rsi_14") and ta["rsi_14"][-1] is not None else None
+    sma20 = ta.get("sma_20", [])
+    sma50 = ta.get("sma_50", [])
+    last_close = closes[-1] if closes else 0
+    above_sma20 = last_close > (sma20[-1] or 0) if sma20 and sma20[-1] else None
+    above_sma50 = last_close > (sma50[-1] or 0) if sma50 and sma50[-1] else None
+    signals_ta = ta.get("signals", []) if ta else []
+
+    earnings_sig = earnings.get("overall_signal") if earnings else None
+    flow_sig = options_flow.get("overall_signal") if options_flow else None
+    flow_conf = options_flow.get("confidence", 0) if options_flow else 0
+
+    #──── Signal determination ──────────────────────────────────────────
+    bullish_score = 0
+    bearish_score = 0
+    risk_score = 0
+
+    if change and change > 0.5: bullish_score += 1
+    elif change and change < -0.5: bearish_score += 1
     if rsi_val is not None:
-        rsi_line = f"RSI: **{rsi_val:.1f}**"
-        if rsi_val > 70: rsi_line += " — overbought territory"
-        elif rsi_val < 30: rsi_line += " — oversold territory"
-        else: rsi_line += " — neutral range"
-        lines.append(rsi_line)
-    if trend:
-        lines.append(f"Trend: **{trend}**")
+        if 40 <= rsi_val <= 60: bullish_score += 1
+        elif rsi_val > 70: bearish_score += 1; risk_score += 1
+        elif rsi_val < 30: bearish_score += 1
+    if above_sma20 and above_sma50: bullish_score += 2
+    elif not above_sma20 and above_sma50 is not None: bearish_score += 1
+    if beta is not None:
+        if beta > 1.5: bearish_score += 1; risk_score += 1
+        elif beta < 0.8: bullish_score += 1
+    if earnings_sig == "bullish": bullish_score += 1
+    elif earnings_sig == "bearish": bearish_score += 1
+    if flow_sig == "bullish": bullish_score += 1
+    elif flow_sig == "bearish": bearish_score += 1
+    if pe is not None and pe > 30: risk_score += 1
+
+    total = bullish_score + bearish_score
+    if total == 0:
+        signal = "neutral"
+        confidence = 30
+    elif bullish_score >= bearish_score + 2 and bullish_score >= 2:
+        signal = "bullish"
+        confidence = min(90, 50 + bullish_score * 10)
+    elif bearish_score >= bullish_score + 2 and bearish_score >= 2:
+        signal = "bearish"
+        confidence = min(90, 50 + bearish_score * 10)
+    elif bullish_score > bearish_score:
+        signal = "bullish"
+        confidence = 40 + bullish_score * 8
+    elif bearish_score > bullish_score:
+        signal = "bearish"
+        confidence = 40 + bearish_score * 8
+    else:
+        signal = "mixed"
+        confidence = 40 + total * 5
+
+    confidence = max(15, min(90, confidence))
+
+    risk_level = "low" if risk_score <= 1 else "moderate" if risk_score <= 2 else "high"
+
+    #── Build response ─────────────────────────────────────────────────
+    lines = []
+
+    # Header
+    lines.append(f"**{ticker.upper()} — {signal.upper()} ({confidence}% confidence)**")
+    if risk_level == "high": lines.append("Risk level: **High**")
+    elif risk_level == "moderate": lines.append("Risk level: **Moderate**")
+    else: lines.append("Risk level: **Low**")
     lines.append("")
+
+    # Market snapshot
+    lines.append("**Market Snapshot**")
+    if price: lines.append(f"• Price: **${price:.2f}** ({change:+.2f}%)")
+    if market_cap:
+        cap_str = f"${market_cap/1e9:.2f}B" if market_cap >= 1e9 else f"${market_cap/1e6:.1f}M"
+        lines.append(f"• Market Cap: **{cap_str}**")
+    if sector: lines.append(f"• Sector: **{sector}**")
+    if beta is not None: lines.append(f"• Beta: **{beta:.2f}**")
+    if pe is not None: lines.append(f"• P/E (TTM): **{pe:.1f}**")
+    if rsi_val is not None:
+        rsi_label = "overbought" if rsi_val > 70 else "oversold" if rsi_val < 30 else "neutral"
+        lines.append(f"• RSI(14): **{rsi_val:.1f}** ({rsi_label})")
+    if above_sma20 is not None:
+        lines.append(f"• vs SMA20: **{'Above' if above_sma20 else 'Below'}**")
+    if above_sma50 is not None:
+        lines.append(f"• vs SMA50: **{'Above' if above_sma50 else 'Below'}**")
+    if high_52w and low_52w and price:
+        pct_from_high = (high_52w - price) / high_52w * 100
+        lines.append(f"• 52W Range: ${low_52w:.2f} – ${high_52w:.2f} ({'Near High' if pct_from_high < 10 else 'Mid-Range'})")
+    if target and price:
+        upside = (target - price) / price * 100
+        lines.append(f"• Analyst Target: **${target:.2f}** ({upside:+.1f}% from current)")
+    lines.append("")
+
+    # Bullish factors
     lines.append("**Bullish Factors**")
-    lines.append(f"• {name} is a leading company in its sector with strong market position")
-    if change and change > 0:
-        lines.append(f"• Positive price momentum today ({change:+.2f}%)")
+    found_bullish = False
+    if change and change > 0.5:
+        lines.append(f"• Positive daily momentum ({change:+.2f}%)")
+        found_bullish = True
+    if above_sma20 and above_sma50:
+        lines.append("• Price is above both 20 and 50-day moving averages — uptrend intact")
+        found_bullish = True
+    if rsi_val is not None and rsi_val < 60:
+        lines.append(f"• RSI at {rsi_val:.1f} — not overbought, room for upside")
+        found_bullish = True
+    if beta is not None and beta < 1.2:
+        lines.append(f"• Low to moderate beta ({beta:.2f}) — less volatile than the market")
+        found_bullish = True
+    if pe is not None and pe < 20:
+        lines.append(f"• P/E of {pe:.1f} is below market average value range")
+        found_bullish = True
+    if earnings_sig == "bullish":
+        lines.append("• Positive earnings surprise history")
+        found_bullish = True
+    if flow_sig == "bullish" and flow_conf > 50:
+        lines.append(f"• Options flow leans bullish (confidence: {flow_conf}%)")
+        found_bullish = True
+    if not found_bullish:
+        lines.append("• No strong bullish signals detected — neutral positioning")
     lines.append("")
-    lines.append("**Bearish Risks**")
+
+    # Bearish / Risk factors
+    lines.append("**Risk Factors**")
+    found_bearish = False
     if rsi_val and rsi_val > 70:
-        lines.append(f"• RSI at {rsi_val:.1f} suggests the stock may be overextended short-term")
-    if trend == "downtrend":
-        lines.append("• Price is in a downtrend — momentum favors sellers")
-    lines.append("• Sector and macro risks apply as with any equity investment")
+        lines.append(f"• RSI at {rsi_val:.1f} — overbought territory, pullback risk")
+        found_bearish = True
+    if beta is not None and beta > 1.5:
+        lines.append(f"• High beta ({beta:.2f}) — amplifies market moves significantly")
+        found_bearish = True
+    if pe is not None and pe > 30:
+        lines.append(f"• Elevated valuation (P/E {pe:.1f}) — high expectations priced in")
+        found_bearish = True
+    if above_sma20 is False:
+        lines.append("• Price below 20-day MA — short-term momentum negative")
+        found_bearish = True
+    if change and change < -1:
+        lines.append(f"• Significant daily decline ({change:.2f}%) — selling pressure")
+        found_bearish = True
+    if earnings_sig == "bearish":
+        lines.append("• Recent earnings trends are negative")
+        found_bearish = True
+    if risk_level == "high":
+        lines.append("• Multiple risk factors active — higher uncertainty than normal")
+        found_bearish = True
+    if not found_bearish:
+        lines.append("• No elevated risk factors detected — normal investment risks apply")
     lines.append("")
+
+    # Beginner explanation
     lines.append("**What This Means**")
-    lines.append(f"{name} is currently showing {'positive' if change and change > 0 else 'mixed'} price action. "
-                 f"The stock{' may be overbought in the near term' if rsi_val and rsi_val > 70 else ' appears reasonably valued based on momentum'}. "
-                 f"As with all individual stocks, this analysis is educational — not financial advice.")
+    if signal == "bullish":
+        lines.append(f"{ticker} is showing mostly positive signals across price action, technical indicators, and market data. "
+                     f"The overall setup suggests bullish positioning with {confidence}% confidence. "
+                     f"However, earnings and sector developments can change the outlook quickly.")
+    elif signal == "bearish":
+        lines.append(f"{ticker} is facing headwinds based on current data. "
+                     f"The bearish signals outweigh the positives at {confidence}% confidence. "
+                     f"Watch for key support levels and any catalyst that could change sentiment.")
+    elif signal == "mixed":
+        lines.append(f"{ticker} has a mix of positive and negative signals — the picture is unclear. "
+                     f"Neither bulls nor bears have a strong case right now. "
+                     f"Waiting for clearer direction may be prudent.")
+    else:
+        lines.append(f"{ticker} shows no strong directional signals at this time. "
+                     f"Neutral positioning with {confidence}% confidence. "
+                     f"Monitor for a catalyst to establish direction.")
+    lines.append("This is educational analysis — not investment advice. Past performance does not guarantee future results.")
+    lines.append("")
+
+    # What to watch
+    lines.append("**What to Watch**")
+    if rsi_val is not None:
+        lines.append(f"• RSI level: currently {rsi_val:.1f} — {'watch for reversal if it reaches 70+' if rsi_val < 65 else 'overbought — watch for bearish divergence'}")
+    if earnings and earnings.get("next_earnings_date"):
+        lines.append(f"• Next earnings: {earnings['next_earnings_date']}")
+    if target and price:
+        lines.append(f"• Analyst target: ${target:.2f} ({((target-price)/price*100):+.1f}% from current)")
+    if sector:
+        lines.append(f"• Sector: {sector} — watch for sector rotation and macro headwinds")
+    lines.append("")
+    lines.append("**Try asking:**")
+    lines.append(f"• \"Show technicals for {ticker}\"")
+    lines.append(f"• \"Check options flow for {ticker}\"")
+    lines.append(f"• \"Analyze {ticker} earnings\"")
+
     return "\n".join(lines)
 
 

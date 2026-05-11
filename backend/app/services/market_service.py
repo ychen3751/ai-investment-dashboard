@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from app.external import yahoo_finance
-from app.core.cache import get_redis
+from app.core.cache import get_redis_safe as get_redis
 
 # ── TTL constants (in seconds) ──────────────────────────────────────────
 TTL_QUOTE = 300        # 5 min — price changes slowly enough

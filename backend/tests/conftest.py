@@ -11,6 +11,14 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.config import settings
+
+# Disable rate limiting for tests — prevents 429 errors from rapid test calls
+settings.RATE_LIMIT_GLOBAL = "1000/minute"
+settings.RATE_LIMIT_LOGIN = "100/minute"
+settings.RATE_LIMIT_ANALYSIS = "100/minute"
+settings.REDIS_URL = ""  # No Redis in test environment — cache/rate-limiting degrade gracefully
+
 from app.db.base import Base
 from app.db.session import engine, get_db
 from app.main import app

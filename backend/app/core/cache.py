@@ -8,21 +8,52 @@ from app.core.config import settings
 _redis: Optional[aioredis.Redis] = None
 
 
-async def get_redis() -> aioredis.Redis:
+async def get_redis() -> Optional[aioredis.Redis]:
     global _redis
-    if _redis is None:
+    if _redis is not None:
+        return _redis
+    if not settings.REDIS_URL:
+        return None
+    try:
         _redis = aioredis.from_url(
             settings.REDIS_URL,
             encoding="utf-8",
             decode_responses=True,
         )
+    except Exception:
+        return None
     return _redis
+
+
+class _NullRedis:
+    """Stand-in when Redis is unavailable — all operations no-op."""
+    async def get(self, *a, **kw): return None
+    async def setex(self, *a, **kw): pass
+    async def smembers(self, *a, **kw): return set()
+    async def sadd(self, *a, **kw): pass
+    async def publish(self, *a, **kw): pass
+
+
+_null_redis = _NullRedis()
+
+
+async def get_redis_safe() -> Any:
+    """Like get_redis() but never returns None (returns a no-op stub instead).
+
+    Callers that want resilience should use this; callers that need real Redis
+    should use get_redis() and handle None.
+    """
+    r = await get_redis()
+    return r if r is not None else _null_redis
 
 
 async def close_redis():
     global _redis
     if _redis:
-        await _redis.close()
+        try:
+            await _redis.close()
+        except Exception:
+            pass
         _redis = None
 
 

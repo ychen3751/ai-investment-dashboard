@@ -100,15 +100,74 @@ Designed to demonstrate production-quality full-stack engineering skills across 
 
 ## 📸 Screenshots
 
-> *Screenshots coming soon*
+### 📊 Dashboard
 
-| Dashboard | Technical Analysis | Portfolio Detail |
-|:---:|:---:|:---:|
-| *Placeholder* | *Placeholder* | *Placeholder* |
+![Dashboard](./screenshots/dashboard.png)
 
-| AI Analysis | Watchlists | Risk Analytics |
-|:---:|:---:|:---:|
-| *Placeholder* | *Placeholder* | *Placeholder* |
+Live market overview with portfolio tracking, AI assistant, and macro intelligence.
+
+---
+
+### 💼 Portfolio Analytics
+
+![Portfolio](./screenshots/portfolio.png)
+
+Portfolio heatmap, concentration analysis, sector exposure, and allocation insights.
+
+---
+
+### 📈 Technical Analysis
+
+![Technical Analysis](./screenshots/technical.png)
+
+TradingView-powered candlestick charts with Bollinger Bands, moving averages, and momentum indicators.
+
+---
+
+### 🤖 AI Analysis
+
+![AI Analysis](./screenshots/ai-analysis.png)
+
+AI-powered stock analysis engine with valuation, trend, and risk scoring.
+
+---
+
+### 🔬 Options Flow Scanner
+
+![Options Flow](./screenshots/options-flow.png)
+
+Institutional-style unusual options activity scanner with bullish/bearish flow detection.
+
+---
+
+### 🌍 Macro Dashboard
+
+![Macro Dashboard](./screenshots/macro.png)
+
+Macro regime analysis with major indices, volatility, rates, commodities, and crypto monitoring.
+
+---
+
+### 🛡️ Risk & Portfolio Advisor
+
+![Risk Advisor](./screenshots/risk-advisor.png)
+
+Portfolio beta, diversification score, exposure analysis, and institutional-grade risk insights.
+
+---
+Custom watchlists, AI intelligence cards, and automated price alerts.
+
+---
+
+## 🌐 Live Demo
+
+### Production Deployment
+
+| Service | URL |
+|---|---|
+| Frontend (Vercel) | https://ai-investment-dashboard-three.vercel.app |
+| Backend API (Railway) | https://ai-investment-dashboard-production.up.railway.app |
+| API Docs | https://ai-investment-dashboard-production.up.railway.app/docs |
 
 ---
 
